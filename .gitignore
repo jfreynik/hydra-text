@@ -1,0 +1,6 @@
+# ignore all . files and . folders
+.*
+vendor/
+
+# Dont ignore .gitignore (this file)
+!/.gitignore

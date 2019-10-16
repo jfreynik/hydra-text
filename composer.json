@@ -1,0 +1,19 @@
+{
+    "name": "jfreynik/hydra-text",
+    "description": "Library to help with processing text.",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Jon Freynik",
+            "email": "jonfreynik@gmail.com"
+        }
+    ],
+    "require": {
+        "react/stream": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "hydra\\text\\": "src/"
+        }
+    }
+}
