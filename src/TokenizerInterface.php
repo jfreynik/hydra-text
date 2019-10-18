@@ -25,13 +25,12 @@ interface TokenizerInterface
     /**
      * 
      */
-    public function addText ($text = "");
+    public function appendText ($text = "");
 
     /*
      * 
-     * /
+     */
     public function prependText ($text ="");
-    */
 
     /*
      * 
@@ -47,6 +46,6 @@ interface TokenizerInterface
     /**
      * 
      */
-    public function nextToken ($emit = true);
+    public function nextToken ();
     
 }

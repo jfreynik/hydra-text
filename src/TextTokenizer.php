@@ -12,13 +12,13 @@ use Evenement\EventEmitter;
 class TextTokenizer extends EventEmitter implements TokenizerInterface
 {
 
-    protected $text;
+    protected $text = "";
 
-    protected $separators;
+    protected $separators = array ();
 
-    protected $index;
+    protected $index = 0;
 
-    protected $length;
+    protected $length = 0;
 
     protected $token;
 
@@ -41,14 +41,13 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         return $this->text;
     }
 
-    public function addText ($text = "")
+    public function appendText ($text = "")
     {
         $this->text = "{$this->text}{$text}";
         $this->length += strlen($text);
         return $this;
     }
 
-    /*
     public function prependText ($text = "")
     {
         $this->text = "{$text}{$this->text}";
@@ -57,7 +56,6 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         $this->index += $len;
         return $this;
     }
-    */
 
     public function setSeparators ($separators = array (" ", "\r\n", "\r", "\n"))
     {

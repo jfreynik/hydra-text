@@ -8,7 +8,7 @@ use React\Stream\ReadableResourceStream as StreamReader;
  * Class used to split streams into tokens based on separator text.
  * This class offers a synchronous and an asynchronous interface.
  * 
- * emits ("token", "error", "end")
+ * emits ("token", "error", "end", "paused", "resumed")
  */
 class StreamTokenizer extends TextTokenizer /* implements Async */
 {
@@ -52,23 +52,55 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
      */
     protected $eof;
 
-    public function __construct ($file = "", $separators = array (" ", "\r", "\n", "\n\r",), $loop = null)
+    public function __construct ($file = "", $separators = array (" ", "\r", "\n", "\r\n",), $loop = null)
     {
+
         if ($loop)
         {
             $this->setLoop($loop);
         }
 
-        if (is_string($file))
-        {
-            $this->setFile($file);
-        }
-
-        else
+        if (is_resource($file))
         {
             $this->setStream($file);
         }
 
+        else if (is_string($file))
+        {
+            if (5 < strlen($file))
+            {
+                $sub = substr($file, 0, 5);
+                $sub = strtolower($sub);
+                if ("text:" === $sub)
+                {
+                    $this->setText(substr($file, 5));
+                }
+
+                else if ("file:" === $sub)
+                {
+                    $this->setFile(substr($file, 5));
+                }
+
+                else if (!is_file($file))
+                {
+                    $this->setText($file);
+                }
+
+                else
+                {
+                    $this->setFile($file);
+                }
+            }
+
+            else
+            {
+                $this->setFile($file);
+            }
+        }
+
+        $this->setSeparators($separators);
+
+        $this->bufferSize = self::DEFAULT_BUFFER_SIZE;
         $this->paused = false;
         $this->running = false;
         $this->eof = false;
@@ -101,29 +133,25 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
     public function pause ()
     {
-        if ($this->loop)
+        if ($this->loop && $this->reader)
         {
             $this->paused = true;
-            if ($this->reader)
-            {
-                $this->reader->pause();
-            }
+            $this->reader->pause();
+            $this->emit("paused");
         }
         return $this;
     }
 
     public function resume ()
     {
-        if ($this->loop)
+        if ($this->loop && $this->reader)
         {
             $this->paused = false;
-            if ($this->reader)
-            {
-                $this->reader->resume();
-                $this->loop->addFutureTick(function () {
-                    $this->processText();
-                });
-            }
+            $this->loop->futureTick(function () {
+                $this->processText();
+            });
+
+            $this->emit("resumed");
         }
         return $this;
     }
@@ -141,12 +169,19 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
     public function setFile ($file = null)
     {
+        if (!is_file($file))
+        {
+            throw new \InvalidArgumentException();
+        }
+
+        $this->stream = fopen($file, "r");
+
         if ($this->loop)
         {
-            $this->stream = fopen("r", $file);
             $this->reader = new StreamReader($this->stream, $this->loop);
             $this->registerListeners($this->reader);
         }
+
         $this->file = $file;
         return $this;
     }
@@ -158,6 +193,11 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
     public function setStream ($stream = null)
     {
+        if (!is_resource($stream))
+        {
+            throw new \InvalidArgumentException();
+        }
+
         if ($this->loop)
         {
             $this->reader = new StreamReader($stream, $this->loop);
@@ -185,48 +225,77 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     */
 
     // not async
-    public function nextToken ($emit = true)
+    public function nextToken ()
     {
         $token = $this->getNextToken();
 
         if ($token["end"])
         {
+            if ($this->stream)
+            {
+                if ($this->eof)
+                {
+                    $this->emit("end", array($token));
+                }
 
+                else
+                {
+                    $text = fgets($this->stream, $this->bufferSize);
+                    if ($text === false)
+                    {
+                        $this->eof = true;
+                        $this->emit("end", array($token));
+                    }
+
+                    else
+                    {
+                        $this->appendText("{$token["token"]}{$token["separator"]}{$text}");
+                        return $this->nextToken($emit);
+                    }
+                }
+            }
+            
+            else
+            {
+                $this->emit("end", array($token));
+            }
         }
 
+        else
+        {
+            $this->emit("token", array($token));
+        }
+
+        return $token;
     }
 
     protected function processText ()
     {
-        /*
-        if ($this->running)
+        if ($this->paused)
         {
-            // only process tokens one at a time
             return;
         }
 
-        $this->running = true;
-        */
-
         $token = $this->getNextToken();
-        $continue = true;
 
         if ($token["end"])
         {
-            // see if the reader is still readable
+            // if we've hit the end of the text we need to go back
+            // to the source / reader for more data 
             if ($this->reader->isReadable())
             {
-                $this->addText($token["text"]);
-                if (!$this->paused)
+                $this->appendText("{$token["token"]}{$token["separator"]}");
+                if (!$this->paused) //< is this check needed?
                 {
-                    $continue = false;
                     $this->reader->resume();
                 }
+                return;
             }
 
             else 
             {
                 $this->emit("end", array ($token));
+                return;
             }
         }
 
@@ -235,9 +304,9 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             $this->emit("token", array ($token));
         }
 
-        if (!$this->paused && $continue)
+        if (!$this->paused) //< is this check needed
         {
-            $this->loop->addFutureTick(function () 
+            $this->loop->futureTick(function () 
             {
                 $this->processText();
             });
@@ -248,21 +317,27 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     {
         if ($reader)
         {
-            $reader->on("data", function ($data) use (&$reader, &$length) 
+            $reader->on("data", function ($data) use (&$reader) 
             {
                 $reader->pause(); 
-                $this->addText($data);
+                $this->appendText($data);
 
                 // once we have text start processing
                 if (!$this->paused)
                 {
-                    $this->processText();
+                    $this->loop->futureTick(function (){
+                        $this->processText();
+                    });
                 }
             });
 
             $reader->on("end", function () {
                 // end of stream
                 $this->eof = true;
+                $this->reader->close();
+                $this->loop->futureTick(function() {
+                    $this->processText();
+                });
             });
 
             $reader->on("error", function ($err) {
