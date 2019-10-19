@@ -352,4 +352,9 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         return $this;
     }
 
+    protected function eofToken ($token = array())
+    {
+        // child classes override to allow emitting final token
+    }
+
 }

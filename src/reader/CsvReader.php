@@ -1,10 +1,10 @@
 <?php
 
-namespace hydra\text\parser;
+namespace hydra\text\reader;
 
 use hydra\text\StreamTokenizer;
 
-class CsvParser extends StreamTokenizer
+class CsvReader extends StreamTokenizer
 {
     protected $currentRow = array ();
 
@@ -34,10 +34,11 @@ class CsvParser extends StreamTokenizer
                     else
                     {
                         // end of column
-                        $token["token"] = "{$text}{$token["token"]}";
-                        $token["length"] = strlen($token["token"]);
-                        $this->currentRow[] = $token;
-                        $this->emit("column", array($token));
+                        $column = "{$text}{$token["token"]}";
+                        $token["token"] = $column;
+                        $token["length"] = strlen($column);
+                        $this->currentRow[] = $column;
+                        $this->emit("column", array($column));
                         return $token;
                     }
                     break;
@@ -78,11 +79,13 @@ class CsvParser extends StreamTokenizer
                     else
                     {
                         // end of column & row
-                        $token["token"] = "{$text}{$token["token"]}";
-                        $token["length"] = strlen($token["token"]);
-                        $this->currentRow[] = $token;
-                        $this->emit("column", array($token));
+                        $column = "{$text}{$token["token"]}";
+                        $token["token"] = $column;
+                        $token["length"] = strlen($column);
+                        $this->currentRow[] = $column;
+                        $this->emit("column", array($column));
                         $this->emit("row", array ($this->currentRow));
+                        $this->currentRow = array ();
                         return $token;
                     }
                     break;
@@ -90,6 +93,7 @@ class CsvParser extends StreamTokenizer
 
             if ($token["end"])
             {
+                // TODO need to find how to get last token to emit "column" etc
                 $token["token"] = "{$text},{$token["token"]}";
                 $token["length"] = strlen($token["token"]);
                 break;
@@ -100,6 +104,11 @@ class CsvParser extends StreamTokenizer
         } while (true);
 
         return $token;
+    }
+
+    protected function eofToken ($token = array())
+    {
+
     }
 
 }
