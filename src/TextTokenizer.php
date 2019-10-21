@@ -20,6 +20,9 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
 
     protected $length = 0;
 
+    protected $eot = false;
+
+    // - needed?
     protected $token;
 
     public function __construct ($text = "", $separators = array (" ", "\r\n", "\r", "\n"))
@@ -30,6 +33,7 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
 
     public function setText ($text = "")
     {
+        $this->eot = false;
         $this->text = $text;
         $this->index = 0;
         $this->length = strlen($text);
@@ -43,11 +47,13 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
 
     public function appendText ($text = "")
     {
+        $this->eot = false;
         $this->text = "{$this->text}{$text}";
         $this->length += strlen($text);
         return $this;
     }
 
+    // is this a needed function?
     public function prependText ($text = "")
     {
         $this->text = "{$text}{$this->text}";
@@ -59,7 +65,20 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
 
     public function setSeparators ($separators = array (" ", "\r\n", "\r", "\n"))
     {
-        arsort($separators);
+        usort($separators, function ($a, $b) {
+            $la = strlen($a);
+            $lb = strlen($b);
+            if ($la != $lb)
+            {
+                return $lb < $la ? -1 : 1;
+            }
+            else if ($a === $b)
+            {
+                return 0;
+            }
+
+            return ($b < $a) ? -1 : 1; 
+        });
         $this->separators = array ();
         for ($i = 0; $i < count($separators); $i++)
         {
@@ -68,6 +87,10 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
                 "length" => strlen($separators[$i]),
             );
         }
+
+        // var_dump($this->separators);
+        // exit;
+
         return $this;
     }
 
@@ -76,22 +99,24 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         return $this->separators;
     }
 
-    public function nextToken ($emit = true)
+    public function nextToken ()
     {
         $token = $this->getNextToken();
 
-        if ($emit)
+        if ($token["end"])
         {
-            if ($token["end"])
-            {
-                $this->emit("end", array($token));
-            }
-
-            else
+            if (!$this->eot)
             {
                 $this->emit("token", array($token));
-            } 
+                $this->eot = true;
+            }
+            $this->emit("end");
         }
+
+        else
+        {
+            $this->emit("token", array($token));
+        } 
 
         return $token;
     }
@@ -137,7 +162,7 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
                             if ($k == ($len - 1))
                             {
                                 $stop = $tmp;
-                                break;
+                                break 2;
                             }
                             continue;
                         }

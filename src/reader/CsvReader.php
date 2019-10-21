@@ -11,7 +11,7 @@ class CsvReader extends StreamTokenizer
     public function __construct ($file = "", $loop = null)
     {
         parent::__construct($file, array (
-            ",", "\n", "\r", "\r\n", "\"", "\"\"",
+            ",", "\n", "\r", "\r\n", "\"", "\"\"", 
         ), $loop);
     }
 
@@ -34,7 +34,7 @@ class CsvReader extends StreamTokenizer
                     else
                     {
                         // end of column
-                        $column = "{$text}{$token["token"]}";
+                        $column = trim("{$text}{$token["token"]}");
                         $token["token"] = $column;
                         $token["length"] = strlen($column);
                         $this->currentRow[] = $column;
@@ -79,7 +79,7 @@ class CsvReader extends StreamTokenizer
                     else
                     {
                         // end of column & row
-                        $column = "{$text}{$token["token"]}";
+                        $column = trim("{$text}{$token["token"]}");
                         $token["token"] = $column;
                         $token["length"] = strlen($column);
                         $this->currentRow[] = $column;
@@ -93,9 +93,19 @@ class CsvReader extends StreamTokenizer
 
             if ($token["end"])
             {
+                $column = trim("{$text}{$token["token"]}");
+                $token["token"] = $column;
+                $token["length"] = strlen($column);
+
                 // TODO need to find how to get last token to emit "column" etc
-                $token["token"] = "{$text},{$token["token"]}";
-                $token["length"] = strlen($token["token"]);
+                if ($token["token"] && $this->eof)
+                {
+                    $this->currentRow[] = $column;
+                    $this->emit("column", array($column));
+                    $this->emit("row", array ($this->currentRow));
+                    $this->currentRow = array ();
+                }
+
                 break;
             }
 
