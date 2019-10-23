@@ -420,8 +420,16 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         return $this;
     }
 
+    /**
+     * Async Interface
+     */
     public function run ()
     {
+        if ($this->paused)
+        {
+            return;
+        }
+
         if ($this->isWin)
         {
             while (!$this->eof())

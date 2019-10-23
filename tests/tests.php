@@ -44,10 +44,10 @@ $csv->on("row", function ($row) {
 // $csv->run();
 */
 
-$txt = new LineReader($file, $loop);
-// $txt = new LineReader($file);
+// $txt = new LineReader($file, $loop);
+$txt = new CsvReader($file, $loop);
 
-$txt->on("line", function ($token) {
+$txt->on("token", function ($token) {
     var_dump(json_encode($token));
 });
 

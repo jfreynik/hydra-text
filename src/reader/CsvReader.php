@@ -4,6 +4,10 @@ namespace hydra\text\reader;
 
 use hydra\text\StreamTokenizer;
 
+/**
+ * 
+ * emits (token, column, row, end)
+ */
 class CsvReader extends StreamTokenizer
 {
     protected $currentRow = array ();
