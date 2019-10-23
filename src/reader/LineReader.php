@@ -19,23 +19,13 @@ class LineReader extends StreamTokenizer
     protected function getNextToken ()
     {
         $token = parent::getNextToken();
-        if ($token["end"])
+
+        if ($token["end"] && !$this->eof())
         {
-            if (// $token["token"] && (
-                ($this->stream && $this->eof) || 
-                (!$this->stream && $this->eot)
-            ) 
-            {
-                $this->emit("line", array (trim($token["token"])));
-            }
-            // $this->emit("line", array (trim($token["token"])));
+            return $token;
         }
 
-        else 
-        {
-            $this->emit("line", array(trim($token["token"])));
-        }
-
+        $this->emit("line", array(trim($token["token"])));        
         return $token;
     }
 

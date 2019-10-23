@@ -23,6 +23,11 @@ class CsvReader extends StreamTokenizer
         do {
             $token = parent::getNextToken();
 
+            if ($token["end"] && !$this->eof())
+            {
+                return $token;
+            }
+
             switch ($token["separator"])
             {
                 case ",":
@@ -54,6 +59,7 @@ class CsvReader extends StreamTokenizer
                     {
                         $boolInString = true;
                     }
+
                     break;
 
                 case "\"\"":
@@ -73,7 +79,7 @@ class CsvReader extends StreamTokenizer
                 case "\r\n":
                     if ($boolInString)
                     {
-                        $text = "{$text}{$token["token"]}\"";
+                        $text = "{$text}{$token["token"]}\n";
                     }
 
                     else
@@ -93,12 +99,12 @@ class CsvReader extends StreamTokenizer
 
             if ($token["end"])
             {
+                
                 $column = trim("{$text}{$token["token"]}");
                 $token["token"] = $column;
-                $token["length"] = strlen($column);
+                // $token["length"] = strlen($column);
 
-                // TODO need to find how to get last token to emit "column" etc
-                if ($token["token"] && $this->eof)
+                if ($this->eof())
                 {
                     $this->currentRow[] = $column;
                     $this->emit("column", array($column));
@@ -114,11 +120,6 @@ class CsvReader extends StreamTokenizer
         } while (true);
 
         return $token;
-    }
-
-    protected function eofToken ($token = array())
-    {
-
     }
 
 }

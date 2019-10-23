@@ -7,6 +7,12 @@ use hydra\text\StreamTokenizer;
 use hydra\text\reader\CsvReader;
 use hydra\text\reader\LineReader;
 
+ini_set("memory_limit", "1M");
+
+// $memory_limit = ini_get('memory_limit');
+// echo $memory_limit;
+// exit;
+
 /*
 $tok = new TextTokenizer();
 
@@ -23,11 +29,31 @@ var_dump($tok->nextToken());
 $loop = React\EventLoop\Factory::create();
 
 $file = dirname(__FILE__)."/old_faithful.csv";
-$file = dirname(__FILE__)."/lines.txt";
-// $csv = new CsvReader($file, $loop);
+//$file = dirname(__FILE__)."/complicated.csv";
+
+// $file = dirname(__FILE__)."/lines.txt";
+// $csv = new CsvReader($file);
+/*
+$csv = new CsvReader($file, $loop);
+
+$csv->on("row", function ($row) {
+    var_dump(json_encode($row));
+    var_dump("---");
+});
+
+// $csv->run();
+*/
 
 $txt = new LineReader($file, $loop);
+// $txt = new LineReader($file);
 
+$txt->on("line", function ($token) {
+    var_dump(json_encode($token));
+});
+
+$loop->run();
+
+/*
 $tok = $txt->nextToken();
 var_dump($tok);
 
@@ -39,6 +65,7 @@ var_dump($tok);
 
 $tok = $txt->nextToken();
 var_dump($tok);
+*/
 
 /*
 $csv->on("column", function ($column) {

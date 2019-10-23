@@ -8,6 +8,7 @@ use React\Stream\ReadableResourceStream as StreamReader;
  * Class used to split streams into tokens based on separator text.
  * This class offers a synchronous and an asynchronous interface.
  * 
+ * 
  * emits ("token", "error", "end", "paused", "resumed")
  */
 class StreamTokenizer extends TextTokenizer /* implements Async */
@@ -57,8 +58,12 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
      */
     protected $toAppend = "";
 
+    protected $isWin = false;
+
     public function __construct ($file = "", $separators = array (" ", "\r", "\n", "\r\n",), $loop = null)
     {
+
+        $this->isWin = (DIRECTORY_SEPARATOR === "\\");
 
         if ($loop)
         {
@@ -115,17 +120,29 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     {
         $this->loop = $loop;
 
-        if ($this->file)
+        if ($this->isWin)
         {
-            $this->stream = fopen("r", $file);
-            $this->reader = new StreamReader($this->stream, $this->loop);
-            $this->registerListeners($this->reader);
+            $loop->futureTick(function () {
+                $this->run();
+            });
         }
 
-        else if ($this->stream)
+        else
         {
-            $this->reader = new StreamReader($this->stream, $this->loop);
-            $this->registerListeners($this->reader);
+            if ($this->file)
+            {
+                // will not work on windows
+                $this->stream = fopen("r", $file);
+                $this->reader = new StreamReader($this->stream, $this->loop);
+                $this->registerListeners($this->reader);
+            }
+
+            else if ($this->stream)
+            {
+                // will not work on windows
+                $this->reader = new StreamReader($this->stream, $this->loop);
+                $this->registerListeners($this->reader);
+            }
         }
 
         return $this;
@@ -181,7 +198,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
         $this->stream = fopen($file, "r");
 
-        if ($this->loop)
+        if ($this->loop && !$this->isWin)
         {
             $this->reader = new StreamReader($this->stream, $this->loop);
             $this->registerListeners($this->reader);
@@ -203,7 +220,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             throw new \InvalidArgumentException();
         }
 
-        if ($this->loop)
+        if ($this->loop && !$this->isWin)
         {
             $this->reader = new StreamReader($stream, $this->loop);
             $this->registerListeners($this->reader);
@@ -212,12 +229,21 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         return $this;
     }
 
+    public function eof ()
+    {
+        if ($this->stream)
+        {
+            return $this->eof;
+        }
+        return $this->eot;
+    }
+
     public function getStream ()
     {
         return $this->stream;
     }
 
-    // not async
+    // not async ---
     public function nextToken ()
     {
         $token = $this->getNextToken();
@@ -228,37 +254,47 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             {
                 if ($this->eof)
                 {
+                    if (!$this->emittedLastToken)
+                    {
+                        $this->emit("token", array($token));
+                        $this->emittedLastToken = true;
+                    }
                     //$this->emit("end", array($token));
                     $this->emit("end");
                 }
 
                 else
                 {
-                    $text = fgets($this->stream, $this->bufferSize);
-                    if ($text === false)
+                    // $text = fgets($this->stream, $this->bufferSize);
+                    // if ($text === false)
+
+                    $text = fread($this->stream, $this->bufferSize);
+                    if ($text === "")
                     {
                         $this->eof = true;
-                        $this->emit("token", array ($token));
-                        $this->emit("end");
+                        // $this->emit("token", array ($token));
+                        // $this->emit("end");
                     }
-
+                    /*
                     else
                     {
-                        // not yet at the end
+                    */
+                        // not yet at the end - append text and try again
                         $this->appendText("{$token["token"]}{$token["separator"]}{$text}");
                         return $this->nextToken();
-                    }
+                    // }
                 }
             }
             
             // using static text instead of file or stream
             else
             {
-                if (!$this->eot)
+                if (!$this->emittedLastToken)
                 {
                     $this->emit("token", array($token));
-                    $this->eot = true;
+                    $this->emittedLastToken = true;
                 }
+
                 // $this->emit("end", array($token));
                 $this->emit("end");
             }
@@ -266,6 +302,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
         else
         {
+            // simply emit the token
             $this->emit("token", array($token));
         }
 
@@ -321,8 +358,17 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         }
     }
 
+    protected function runSync ()
+    {
+        // call run in a blocking manner
+        $this->run();
+    }
+
     protected function registerListeners ($reader = null)
     {
+        // local file system async only works on linux
+        // can we call with loop on windows and process
+        // semi-async?
         if ($reader)
         {
             $reader->on("data", function ($data) use (&$reader) 
@@ -374,9 +420,20 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         return $this;
     }
 
-    protected function eofToken ($token = array())
+    public function run ()
     {
-        // child classes override to allow emitting final token
+        if ($this->isWin)
+        {
+            while (!$this->eof())
+            {
+                $this->nextToken();
+            }
+        }
+
+        else
+        {
+            $this->processText();
+        }
     }
 
 }

@@ -47,5 +47,10 @@ interface TokenizerInterface
      * 
      */
     public function nextToken ();
+
+    /**
+     * 
+     */
+    public function run ();
     
 }
