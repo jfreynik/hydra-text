@@ -58,6 +58,9 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
      */
     protected $toAppend = "";
 
+    /**
+     * 
+     */
     protected $isWin = false;
 
     public function __construct ($file = "", $separators = array (" ", "\r", "\n", "\r\n",), $loop = null)
@@ -170,7 +173,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         {
             $this->paused = false;
             $this->loop->futureTick(function () {
-                $this->processText();
+                $this->run();
             });
 
             $this->emit("resumed");
@@ -231,22 +234,42 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
     public function eof ()
     {
-        if ($this->stream)
-        {
-            return $this->eof;
-        }
-        return $this->eot;
+        return $this->stream ? $this->eof : $this->eot;
     }
 
     public function getStream ()
     {
         return $this->stream;
     }
+    
+    public function on ($event, callable $listener)
+    {
+        if ("end" === $event &&
+            $this->eof
+        )
+        {
+            // skip registering the listener
+            $listener();
+            return;
+        }
 
-    // not async ---
+        return parent::on($event, $listener);
+    }
+
+    /**
+     * @overridden
+     */
     public function nextToken ()
     {
         $token = $this->getNextToken();
+
+        $args = func_get_args();
+        /*
+        if (isset($args[0])) {
+            var_dump($this->eof);
+            exit;
+        }
+        */
 
         if ($token["end"])
         {
@@ -256,60 +279,50 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
                 {
                     if (!$this->emittedLastToken)
                     {
-                        $this->emit("token", array($token));
                         $this->emittedLastToken = true;
-                    }
-                    //$this->emit("end", array($token));
-                    $this->emit("end");
+                        $this->emit("token", array($token));
+                        $this->emit("end");
+                    }                    
                 }
 
                 else
                 {
-                    // $text = fgets($this->stream, $this->bufferSize);
-                    // if ($text === false)
-
                     $text = fread($this->stream, $this->bufferSize);
                     if ($text === "")
                     {
                         $this->eof = true;
-                        // $this->emit("token", array ($token));
-                        // $this->emit("end");
                     }
-                    /*
-                    else
-                    {
-                    */
-                        // not yet at the end - append text and try again
-                        $this->appendText("{$token["token"]}{$token["separator"]}{$text}");
-                        return $this->nextToken();
-                    // }
+
+                    // not yet at the end - append text and try again
+                    $text = "{$token["token"]}{$token["separator"]}{$text}";
+                    $this->appendText($text);
+                    return $this->nextToken();
                 }
             }
             
-            // using static text instead of file or stream
             else
             {
+                // no stream in use
                 if (!$this->emittedLastToken)
                 {
                     $this->emit("token", array($token));
+                    $this->emit("end");
                     $this->emittedLastToken = true;
                 }
-
-                // $this->emit("end", array($token));
-                $this->emit("end");
+                
+                $this->eof = true;
             }
         }
 
         else
         {
-            // simply emit the token
             $this->emit("token", array($token));
         }
 
         return $token;
     }
 
-    protected function processText ()
+    protected function nextTokenAsync ()
     {
         if ($this->paused)
         {
@@ -320,26 +333,23 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
         if ($token["end"])
         {
-            // if we've hit the end of the text we need to go back
-            // to the source / reader for more data 
-            if ($this->reader->isReadable())
+            if ($this->eof)
             {
-                // $this->appendText("{$token["token"]}{$token["separator"]}");
+                if (!$this->emittedLastToken)
+                {
+                    $this->emit("token", array ($token));
+                    $this->emit("end");
+                    $this->emittedLastToken = true;
+                }
+                return;
+            } 
+            
+            else {
                 $this->toAppend = "{$token["token"]}{$token["separator"]}";
-                if (!$this->paused) //< is this check needed?
+                if (!$this->paused)
                 {
                     $this->reader->resume();
                 }
-                return;
-            }
-
-            else 
-            {
-                if ($token["token"])
-                {
-                    $this->emit("token", array ($token));
-                }
-                $this->emit("end");
                 return;
             }
         }
@@ -349,19 +359,13 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             $this->emit("token", array ($token));
         }
 
-        if (!$this->paused) //< is this check needed
+        if (!$this->paused)
         {
             $this->loop->futureTick(function () 
             {
-                $this->processText();
+                $this->nextTokenAsync();
             });
         }
-    }
-
-    protected function runSync ()
-    {
-        // call run in a blocking manner
-        $this->run();
     }
 
     protected function registerListeners ($reader = null)
@@ -374,19 +378,23 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             $reader->on("data", function ($data) use (&$reader) 
             {
                 $reader->pause(); 
+                
+                /*
                 if ($this->toAppend)
                 {
                     $this->appendText($this->toAppend);
                     $this->toAppend = "";
                 }
+                */
 
-                $this->appendText($data);
+                $this->appendText("{$this->toAppend}{$data}");
+                $this->toAppend = "";
 
                 // once we have text start processing
                 if (!$this->paused)
                 {
                     $this->loop->futureTick(function (){
-                        $this->processText();
+                        $this->nextTokenAsync();
                     });
                 }
             });
@@ -404,7 +412,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
                 }
 
                 $this->loop->futureTick(function() {
-                    $this->processText();
+                    $this->nextTokenAsync();
                 });
             });
 
@@ -421,7 +429,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     }
 
     /**
-     * Async Interface
+     * Synchronous / Asynchronous Method.
      */
     public function run ()
     {
@@ -430,17 +438,34 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             return;
         }
 
-        if ($this->isWin)
+        if ($this->loop)
         {
-            while (!$this->eof())
+            if ($this->isWin)
             {
-                $this->nextToken();
+                if (!$this->eof && !$this->paused)
+                {
+                    // mimic async
+                    $this->nextToken();
+                    $this->loop->futureTick(function () {
+                        $this->run();
+                    });
+                }
+            }
+
+            else
+            {
+                // real async
+                $this->nextTokenAsync();
             }
         }
 
         else
         {
-            $this->processText();
+            // synchronous
+            while (!$this->eof)
+            {
+                $this->nextToken();
+            }
         }
     }
 

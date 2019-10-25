@@ -44,14 +44,21 @@ $csv->on("row", function ($row) {
 // $csv->run();
 */
 
-// $txt = new LineReader($file, $loop);
-$txt = new CsvReader($file, $loop);
+$txt = new LineReader($file, $loop);
+// $txt = new LineReader($file);
+// $txt = new CsvReader($file, $loop);
 
-$txt->on("token", function ($token) {
-    var_dump(json_encode($token));
+$txt->on("line", function ($token) {
+    var_dump(json_encode("line: {$token}"));
+});
+
+$txt->on("end", function () use (&$txt) {
+    // var_dump($txt->nextToken());
+    var_dump("end");
 });
 
 $loop->run();
+// $txt->run();
 
 /*
 $tok = $txt->nextToken();

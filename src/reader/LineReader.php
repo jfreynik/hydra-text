@@ -5,7 +5,7 @@ namespace hydra\text\reader;
 use hydra\text\StreamTokenizer;
 
 /**
- * 
+ * Class can be used to process file one line at a time.
  */
 
 class LineReader extends StreamTokenizer
@@ -20,7 +20,8 @@ class LineReader extends StreamTokenizer
     {
         $token = parent::getNextToken();
 
-        if ($token["end"] && !$this->eof())
+        // if we have more text or we already emitted the last token
+        if (($token["end"] && !$this->eof) || $this->emittedLastToken)
         {
             return $token;
         }

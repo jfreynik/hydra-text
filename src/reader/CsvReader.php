@@ -27,7 +27,7 @@ class CsvReader extends StreamTokenizer
         do {
             $token = parent::getNextToken();
 
-            if ($token["end"] && !$this->eof())
+            if ($token["end"] && !$this->eof)
             {
                 return $token;
             }
@@ -45,7 +45,6 @@ class CsvReader extends StreamTokenizer
                         // end of column
                         $column = trim("{$text}{$token["token"]}");
                         $token["token"] = $column;
-                        $token["length"] = strlen($column);
                         $this->currentRow[] = $column;
                         $this->emit("column", array($column));
                         return $token;
@@ -91,7 +90,6 @@ class CsvReader extends StreamTokenizer
                         // end of column & row
                         $column = trim("{$text}{$token["token"]}");
                         $token["token"] = $column;
-                        $token["length"] = strlen($column);
                         $this->currentRow[] = $column;
                         $this->emit("column", array($column));
                         $this->emit("row", array ($this->currentRow));
@@ -106,9 +104,8 @@ class CsvReader extends StreamTokenizer
                 
                 $column = trim("{$text}{$token["token"]}");
                 $token["token"] = $column;
-                // $token["length"] = strlen($column);
 
-                if ($this->eof())
+                if ($this->eof)
                 {
                     $this->currentRow[] = $column;
                     $this->emit("column", array($column));
@@ -118,8 +115,6 @@ class CsvReader extends StreamTokenizer
 
                 break;
             }
-
-            // $text .= $token["token"];
 
         } while (true);
 
