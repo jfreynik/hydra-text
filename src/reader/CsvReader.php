@@ -6,7 +6,7 @@ use hydra\text\StreamTokenizer;
 
 /**
  * 
- * emits (token, column, row, end)
+ * emits (column, row, token, end)
  */
 class CsvReader extends StreamTokenizer
 {

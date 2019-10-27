@@ -429,7 +429,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     }
 
     /**
-     * Synchronous / Asynchronous Method.
+     * Synchronous / Asynchronous method for processing text.
      */
     public function run ()
     {

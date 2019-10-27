@@ -4,7 +4,7 @@ namespace hydra\text\reader;
 
 /**
  * 
- * emits(param)
+ * emits(scheme, host, port, user, pass, path, query, fragment)
  */
 class UrlReader extends StreamTokenizer
 {
@@ -14,6 +14,11 @@ class UrlReader extends StreamTokenizer
         parent::__construct($file, array(
             "&", "=", "/", "?", ":", ".", "[", "]", "://"
         ), $loop);
+    }
+
+    protected function getNextToken ()
+    {
+
     }
 
 }
