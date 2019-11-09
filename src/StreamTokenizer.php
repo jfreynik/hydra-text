@@ -9,7 +9,7 @@ use React\Stream\ReadableResourceStream as StreamReader;
  * This class offers a synchronous and an asynchronous interface.
  * 
  * 
- * emits ("token", "error", "end", "paused", "resumed")
+ * emits ("token", "error", "end", "pause", "resume")
  */
 class StreamTokenizer extends TextTokenizer /* implements Async */
 {
@@ -73,42 +73,20 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             $this->setLoop($loop);
         }
 
-        if (is_resource($file))
+        $type = $this->getFileType($file);
+        if ("stream" == $type["type"])
         {
-            $this->setStream($file);
+            $this->setStream($type["file"]);
         }
 
-        else if (is_string($file))
+        else if ("text" == $type["type"])
         {
-            if (5 < strlen($file))
-            {
-                $sub = substr($file, 0, 5);
-                $sub = strtolower($sub);
-                if ("text:" === $sub)
-                {
-                    $this->setText(substr($file, 5));
-                }
-
-                else if ("file:" === $sub)
-                {
-                    $this->setFile(substr($file, 5));
-                }
-
-                else if (!is_file($file))
-                {
-                    $this->setText($file);
-                }
-
-                else
-                {
-                    $this->setFile($file);
-                }
-            }
-
-            else
-            {
-                $this->setFile($file);
-            }
+            $this->setText($type["text"]);
+        } 
+        
+        else
+        {
+            $this->setFile($type["file"]);
         }
 
         $this->setSeparators($separators);
@@ -117,6 +95,20 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         $this->paused = false;
         $this->running = false;
         $this->eof = false;
+    }
+
+    public function copy ($copy = null)
+    {
+        if ($copy)
+        {
+            $loop = $copy->getLoop();
+            return $copy;
+        }
+        
+        $loop = $this->getLoop();
+
+        // $copy = new 
+        return $copy;
     }
 
     public function setLoop ($loop = null)
@@ -162,7 +154,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         {
             $this->paused = true;
             $this->reader->pause();
-            $this->emit("paused");
+            $this->emit("pause");
         }
         return $this;
     }
@@ -176,7 +168,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
                 $this->run();
             });
 
-            $this->emit("resumed");
+            $this->emit("resume");
         }
         return $this;
     }
@@ -209,6 +201,63 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
         $this->file = $file;
         return $this;
+    }
+
+    public function getFileType ($file = "")
+    {
+        if (is_resource($file))
+        {
+            return array (
+                "type" => "stream",
+                "file" => $file,
+            );
+        }
+
+        else if (is_string($file))
+        {
+            if (5 < strlen($file))
+            {
+                $sub = substr($file, 0, 5);
+                $sub = strtolower($sub);
+                if ("text:" === $sub)
+                {
+                    $text = (substr($file, 5));
+                    return array (
+                        "type" => "text",
+                        "text" => $text,
+                    );
+                }
+
+                else if ("file:" === $sub)
+                {
+                    $file = trim(substr($file, 5));
+                    return array (
+                        "type" => "file",
+                        "file" => $file,
+                    );
+                }
+            }
+            if (!is_file($file))
+            {
+                return array (
+                    "type" => "text",
+                    "text" => $file,
+                );
+            }
+
+            else
+            {
+                return array (
+                    "type" => "file",
+                    "file" => $file,
+                );
+            }
+        }
+
+        return array (
+            "type" => "error",
+            "message" => "type not usable in stream tokenizer",
+        );
     }
 
     public function getFile ()

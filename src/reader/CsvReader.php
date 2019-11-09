@@ -8,7 +8,7 @@ use hydra\text\StreamTokenizer;
  * 
  * emits (column, row, token, end)
  */
-class CsvReader extends StreamTokenizer
+class CsvReader extends StreamTokenizer implements ReaderInterface
 {
     protected $currentRow = array ();
 
@@ -119,6 +119,14 @@ class CsvReader extends StreamTokenizer
         } while (true);
 
         return $token;
+    }
+
+    public function serialize ($file = null)
+    {
+        $data = array ();
+        $this->on("row", function ($row) {
+            
+        });
     }
 
 }

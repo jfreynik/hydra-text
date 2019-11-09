@@ -15,12 +15,12 @@ use hydra\text\reader\LineReader;
 
 $loop = React\EventLoop\Factory::create();
 
+
 $file = dirname(__FILE__)."/old_faithful.csv";
 $csv = new CsvReader($file, $loop);
 
 $csv->on("row", function ($row) {
     var_dump(json_encode($row));
 });
-
 
 $loop->run();
