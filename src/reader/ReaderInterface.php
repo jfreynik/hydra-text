@@ -7,7 +7,7 @@ namespace hydra\text\reader;
  * it into a data (data structured) representation.
  *  
  */
-interface Reader 
+interface ReaderInterface
 {
 
     /**
@@ -16,7 +16,7 @@ interface Reader
     public function getEmits (); 
 
     /**
-     * Loop over all of the text and emit the different tokens found.
+     * Loop over all of the text synchronously and emit the different tokens found.
      */
     public function run ();
 

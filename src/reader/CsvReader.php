@@ -19,6 +19,11 @@ class CsvReader extends StreamTokenizer implements ReaderInterface
         ), $loop);
     }
 
+    public function getEmits ()
+    {
+        return array ("column", "row", "token", "end");
+    }
+
     protected function getNextToken ()
     {
         $boolInString = false;

@@ -63,6 +63,14 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
      */
     protected $isWin = false;
 
+    /**
+     * 
+     */
+    protected $resourceType = "";
+
+    /**
+     * 
+     */
     public function __construct ($file = "", $separators = array (" ", "\r", "\n", "\r\n",), $loop = null)
     {
 
@@ -73,20 +81,23 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             $this->setLoop($loop);
         }
 
-        $type = $this->getFileType($file);
-        if ("stream" == $type["type"])
-        {
-            $this->setStream($type["file"]);
-        }
-
-        else if ("text" == $type["type"])
-        {
-            $this->setText($type["text"]);
-        } 
+        $type = self::findResourceType($file);
         
-        else
+        if ($type) 
         {
-            $this->setFile($type["file"]);
+            switch ($type["type"])
+            {
+                case "stream":
+                    $this->setStream($file);
+                    break;
+                case "text":
+                    $this->setText($file);
+                    break;
+                case "file":
+                default:
+                    $this->setFile($file);
+                    break;
+            }
         }
 
         $this->setSeparators($separators);
@@ -97,18 +108,73 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         $this->eof = false;
     }
 
-    public function copy ($copy = null)
+    public function getResourceType ()
     {
-        if ($copy)
-        {
-            $loop = $copy->getLoop();
-            return $copy;
-        }
-        
-        $loop = $this->getLoop();
+        return $this->resourceType;
+    }
 
-        // $copy = new 
-        return $copy;
+    public static function findResourceType ($file = "")
+    {
+        if (!is_resource($file))
+        {
+            if (is_string($file))
+            {
+                $len = strlen($file);
+                if (5 < $len)
+                {
+                    $sub = substr($file, 0, 5);
+                    $sub = strtolower($sub);
+                    $sub = strtolower($sub);
+                    if ("text:" === $sub)
+                    {
+                        $text = (substr($file, 5));
+                        return array (
+                            "type" => "text",
+                            "text" => $text,
+                        );
+                    }
+
+                    else if ("file:" === $sub)
+                    {
+                        $file = trim(substr($file, 5));
+                        return array (
+                            "type" => "file",
+                            "file" => $file,
+                        );
+                    }
+                }
+
+                return is_file($file) ?
+                    array (
+                        "type" => "file",
+                        "file" => $file
+                    ) : array (
+                        "type" => "text",
+                        "text" => $file
+                    );
+            }
+            
+            return false;
+        }
+
+        return array (
+            "type" => "stream",
+            "file" => $file,
+        );
+    }
+
+    public function copy ()
+    {
+        switch ($this->resourceType)
+        {
+            case "text":
+                return new static($this->text, $this->separators, $this->loop);
+            case "file":
+                return new static($this->file, $this->separators, $this->loop);
+            case "stream":
+                return new static ($this->stream, $this->separators, $this->loop);
+        }
+        return false;
     }
 
     public function setLoop ($loop = null)
@@ -182,7 +248,13 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     {
         $this->bufferSize = $size;
         return $this;
-    } 
+    }
+
+    public function setText ($text = "")
+    {
+        $this->resourceType = "text";
+        return parent::setText($text);
+    }
 
     public function setFile ($file = null)
     {
@@ -191,6 +263,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             throw new \InvalidArgumentException();
         }
 
+        $this->resourceType = "file";
         $this->stream = fopen($file, "r");
 
         if ($this->loop && !$this->isWin)
@@ -201,63 +274,6 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
         $this->file = $file;
         return $this;
-    }
-
-    public function getFileType ($file = "")
-    {
-        if (is_resource($file))
-        {
-            return array (
-                "type" => "stream",
-                "file" => $file,
-            );
-        }
-
-        else if (is_string($file))
-        {
-            if (5 < strlen($file))
-            {
-                $sub = substr($file, 0, 5);
-                $sub = strtolower($sub);
-                if ("text:" === $sub)
-                {
-                    $text = (substr($file, 5));
-                    return array (
-                        "type" => "text",
-                        "text" => $text,
-                    );
-                }
-
-                else if ("file:" === $sub)
-                {
-                    $file = trim(substr($file, 5));
-                    return array (
-                        "type" => "file",
-                        "file" => $file,
-                    );
-                }
-            }
-            if (!is_file($file))
-            {
-                return array (
-                    "type" => "text",
-                    "text" => $file,
-                );
-            }
-
-            else
-            {
-                return array (
-                    "type" => "file",
-                    "file" => $file,
-                );
-            }
-        }
-
-        return array (
-            "type" => "error",
-            "message" => "type not usable in stream tokenizer",
-        );
     }
 
     public function getFile ()
@@ -271,6 +287,8 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         {
             throw new \InvalidArgumentException();
         }
+
+        $this->resourceType = "stream";
 
         if ($this->loop && !$this->isWin)
         {
@@ -479,6 +497,8 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
     /**
      * Synchronous / Asynchronous method for processing text.
+     * 
+     * this method is pointless from a async perspective - as relies completely on the loop run method ...
      */
     public function run ()
     {
@@ -494,8 +514,8 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
                 if (!$this->eof && !$this->paused)
                 {
                     // mimic async
-                    $this->nextToken();
                     $this->loop->futureTick(function () {
+                        $this->nextToken();
                         $this->run();
                     });
                 }
@@ -504,7 +524,9 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             else
             {
                 // real async
-                $this->nextTokenAsync();
+                $this->loop->futureTick(function() {
+                    $this->nextTokenAsync();
+                });
             }
         }
 

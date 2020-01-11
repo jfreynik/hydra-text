@@ -25,12 +25,36 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
     // internal flag to prevent sending last token multiple times 
     protected $emittedLastToken = false;
 
+    /**
+     * Constructor
+     * 
+     * Creates a TextTokenizer object.
+     * 
+     * @var $text string
+     * @var $separators array
+     */
     public function __construct ($text = "", $separators = array (" ", "\r\n", "\r", "\n"))
     {
         $this->setText($text);
         $this->setSeparators($separators);
     }
 
+    /**
+     * Copy Constructor
+     * 
+     * Created a copy from a TextTokenizer object.
+     */
+    public function copy ()
+    {
+        $temp = new TextTokenizer();
+        $temp->setText($this->text);
+        $temp->setSeparators($this->separators);
+        return $temp;
+    }
+
+    /**
+     * Sets the text of the TextTokenizer.
+     */
     public function setText ($text = "")
     {
         if ($text)
@@ -44,11 +68,17 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         return $this;
     }
 
+    /**
+     * Returns the TextTokenizer's text.
+     */
     public function getText ()
     {
         return $this->text;
     }
 
+    /**
+     * Concatenate's the provided text with the current text.
+     */
     public function appendText ($text = "")
     {
         if ($text)
@@ -61,7 +91,7 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         return $this;
     }
 
-    // is this a needed function?
+    /* - does not seem needed ...
     public function prependText ($text = "")
     {
         $this->text = "{$text}{$this->text}";
@@ -70,7 +100,19 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         $this->index += $len;
         return $this;
     }
+    */
 
+    /**
+     * Returns the events that the TextTokenizer emits.
+     */
+    public function getEmits ()
+    {
+        return array ("token", "end");
+    }
+
+    /**
+     * Set the separators for the TextTokenizer.
+     */
     public function setSeparators ($separators = array (" ", "\r\n", "\r", "\n"))
     {
         // sort the separators by strlen first then by alpha
@@ -104,22 +146,34 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         return $this;
     }
 
+    /**
+     * Returns the TextTokenizer's separators.
+     * @return array 
+     */
     public function getSeparators ()
     { 
         return $this->separators;
     }
 
+    /**
+     * Checks if there is more text to process.
+     * @return bool
+     */
     public function eot ()
     {
         return $this->eot;
     }
 
+    /**
+     * 
+     */
     public function nextToken ()
     {
         $token = $this->getNextToken();
 
         if ($token["end"])
         {
+            // prevent emitting multiple "end" events
             if (!$this->emittedLastToken)
             {
                 $this->emittedLastToken = true;
@@ -136,6 +190,9 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         return $token;
     }
 
+    /**
+     * @internal
+     */
     protected function getNextToken ()
     {
         if ($this->length <= $this->index)
@@ -221,14 +278,37 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
 
     }
 
-    public function run ()
+    /**
+     * 
+     * 
+     */
+    public function tokenize ()
     {
-        while (!$this->eot)
+        $tokens = array ();
+        $emits = $this->getEmits();
+
+        // working with copy may cause more confusion
+        $copy = $this->copy();
+
+        for ($i = 0; $i < count($emits); $i++) 
         {
-            $this->nextToken();
+            $emit = $emits[$i];
+            $copy->on($emit, function ($token) use ($emit, &$tokens) {
+                $tokens[] = array ($emit, $token);
+            });
         }
+
+        while (!$copy->eot)
+        {
+            $copy->nextToken();
+        }
+
+        return $tokens;
     }
 
+    /* 
+    not really needed ...
+    quick hack to notify late registered listeners
     public function on ($event, callable $listener)
     {
         if ("end" === $event &&
@@ -242,5 +322,5 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
 
         return parent::on($event, $listener);
     }
-
+    */
 }

@@ -13,14 +13,15 @@ use hydra\text\reader\LineReader;
 // echo $memory_limit;
 // exit;
 
-$loop = React\EventLoop\Factory::create();
-
-
+// $loop = React\EventLoop\Factory::create();
 $file = dirname(__FILE__)."/old_faithful.csv";
-$csv = new CsvReader($file, $loop);
+// $csv = new CsvReader($file, $loop);
+$csv = new CsvReader($file);
 
 $csv->on("row", function ($row) {
     var_dump(json_encode($row));
 });
 
-$loop->run();
+//$loop->run();
+
+$csv->run();
