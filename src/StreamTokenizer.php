@@ -183,9 +183,8 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
         if ($this->isWin)
         {
-            $loop->futureTick(function () {
-                $this->run();
-            });
+            // start processing when loop is run
+            $this->run();
         }
 
         else
@@ -331,12 +330,6 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
         $token = $this->getNextToken();
 
         $args = func_get_args();
-        /*
-        if (isset($args[0])) {
-            var_dump($this->eof);
-            exit;
-        }
-        */
 
         if ($token["end"])
         {
@@ -445,14 +438,6 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
             $reader->on("data", function ($data) use (&$reader) 
             {
                 $reader->pause(); 
-                
-                /*
-                if ($this->toAppend)
-                {
-                    $this->appendText($this->toAppend);
-                    $this->toAppend = "";
-                }
-                */
 
                 $this->appendText("{$this->toAppend}{$data}");
                 $this->toAppend = "";
@@ -496,9 +481,7 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
     }
 
     /**
-     * Synchronous / Asynchronous method for processing text.
      * 
-     * this method is pointless from a async perspective - as relies completely on the loop run method ...
      */
     public function run ()
     {
@@ -523,21 +506,55 @@ class StreamTokenizer extends TextTokenizer /* implements Async */
 
             else
             {
-                // real async
-                $this->loop->futureTick(function() {
-                    $this->nextTokenAsync();
-                });
+                if (!$this->stream)
+                {
+                    // just text - mimic async
+                    $this->loop->futureTick(function() {
+                        $this->nextToken();
+                        $this->run();
+                    });
+                }
+
+                // else stream will be handled by the rejistered reader
             }
         }
 
         else
         {
-            // synchronous
+            // no loop? - completely synchronous
             while (!$this->eof)
             {
                 $this->nextToken();
             }
         }
+    }
+
+    public function asyncTokenize ()
+    {
+        // return a promise or event callback
+    }
+
+    // synchronous
+    public function tokenize ()
+    {
+        $copy = $this->copy();
+        $emits = $this->getEmits();
+        $tokens = array ();
+
+        for ($i = 0; $i < count($emits); $i++)
+        {
+            $emit = $emits[$i];
+            $copy->on($emits[$i], function ($data) use ($emit, &$tokens) {
+                $tokens[] = array ($emit, $data);
+            })
+        }
+
+        while (!$copy->eof)
+        {
+            $copy->nextToken();
+        }
+
+        return $tokens;
     }
 
 }

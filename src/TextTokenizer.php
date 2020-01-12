@@ -6,6 +6,7 @@ use Evenement\EventEmitter;
 
 /**
  * Class used to split strings into tokens based on separator text.
+ * All methods in this class are synchronous.
  * 
  * emits ("token", "end")
  */
@@ -304,6 +305,15 @@ class TextTokenizer extends EventEmitter implements TokenizerInterface
         }
 
         return $tokens;
+    }
+
+    public function run ()
+    {
+        while (!$this->eot)
+        {
+            $this->nextToken();
+        }
+        return $this;
     }
 
     /* 
